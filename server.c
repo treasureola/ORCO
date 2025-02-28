@@ -1,19 +1,4 @@
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <signal.h>
-
-#define SOCKET_PATH "/tmp/socket"
-struct ucred
-{
-    pid_t pid;
-    uid_t uid;
-    gid_t gid;
-};
+#include "comm.h"
 
 void handle_client(int client_fd)
 {

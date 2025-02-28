@@ -1,17 +1,25 @@
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "comm.h"
 
 int main(){
+    pid_t pid = getpid();
+    uid_t uid = getuid();
+    gid_t gid = getgid();
+    
+    printf("Client pid: %d\n", pid);
+    printf("Client uid: %d\n", uid);
+    printf("Client gid: %d\n", gid);
+
     // Create the socket
     int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (socket_fd < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
 
     struct sockaddr_un *addr = malloc(sizeof(struct sockaddr_un));
     memset(addr, 0, sizeof(struct sockaddr_un));
     addr->sun_family = AF_UNIX;
-    strncpy(addr->sun_path, "/tmp/socket", sizeof(addr->sun_path) - 1);
+    strncpy(addr->sun_path, SOCKET_PATH, sizeof(addr->sun_path) - 1);
 
     printf("Client connecting\n");
     // Connect to the server
@@ -23,14 +31,25 @@ int main(){
     
     printf("Connected to server\n");
 
-    // // Send a message to the server
-    // char *message = "Hello, server!";
-    // send(socket_fd, message, strlen(message), 0);
+    // Send credentials to the server
+    struct ucred creds;
+    creds.pid = pid;
+    creds.uid = uid;
+    creds.gid = gid;
 
-    // // Receive a message from the server
-    // char buffer[1024];
-    // recv(socket_fd, buffer, sizeof(buffer), 0);
-    // printf("Received: %s\n", buffer);
+    struct msghdr msgh = {0};
+    
+    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
+    char *controlMsg = malloc(controlMsgSize);
+    msgh.msg_control = controlMsg;
+    msgh.msg_controllen = controlMsgSize;
+
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msgh);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_CREDENTIALS;
+
+    // Close the socket
+    close(socket_fd);
 
     return 0;
 }
