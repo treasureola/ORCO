@@ -8,6 +8,8 @@
 #include <stdio.h>      // For perror(), printf(), etc.
 #include <stdlib.h>     // For exit(), etc.
 #include <string.h>
+#include <poll.h>
 
 #define SOCKET_PATH "/tmp/socket"
+#define MAX_EVENTS 10
 #endif
