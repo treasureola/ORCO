@@ -6,7 +6,7 @@ void handle_client(int client_fd)
 
     struct ucred creds;
     socklen_t len = sizeof(creds);
-    if (getsockopt(client_fd, SOL_SOCKET, LOCAL_PEERCRED, &creds, &len) < 0)
+    if (getsockopt(client_fd, SOL_SOCKET, SCM_CREDENTIALS, &creds, &len) < 0)
     {
         perror("getsockopt failed");
     }

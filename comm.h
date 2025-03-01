@@ -1,4 +1,6 @@
-
+#ifndef H_ORCO_COMMON
+#define H_ORCO_COMMON
+#define _GNU_SOURCE
 #include <sys/socket.h> // For socket(), sendmsg(), recvmsg(), and SCM_CREDENTIALS
 #include <sys/types.h>  // For pid_t, uid_t, etc.
 #include <sys/un.h>
@@ -8,6 +10,8 @@
 #include <string.h>
 
 #define SOCKET_PATH "/tmp/socket"
+#endif
+;
 
 struct ucred {
     pid_t pid;
