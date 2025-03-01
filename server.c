@@ -1,37 +1,50 @@
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <signal.h>
-#include <poll.h>  // For using poll instead of epoll
-
-#define SOCKET_PATH "/tmp/socket"
-#define MAX_EVENTS 10 // Maximum number for poll to handle at once
-
-struct ucred
-{
-    pid_t pid;
-    uid_t uid;
-    gid_t gid;
-};
+#include "comm.h"
 
 void handle_client(int client_fd)
 {
-    printf("Client %d connected\n", client_fd);
+    sleep(1);
+    printf("Server: Client %d connected\n", client_fd);
 
-    struct ucred creds;
-    socklen_t len = sizeof(creds);
-    if (getsockopt(client_fd, SOL_SOCKET, LOCAL_PEERCRED, &creds, &len) < 0)
+    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
+    char *controlMsg = malloc(controlMsgSize);
+
+    struct msghdr msgh;
+    memset(&msgh, 0, sizeof(struct msghdr));
+
+    char dummy;
+    struct iovec iov;
+    iov.iov_base = &dummy;
+    iov.iov_len = sizeof(dummy);
+
+    msgh.msg_iov = &iov;
+    msgh.msg_iovlen = 1;
+    msgh.msg_control = controlMsg;
+    msgh.msg_controllen = controlMsgSize;
+
+    ssize_t bytesReceived = recvmsg(client_fd, &msgh, 0);
+    printf("Server: Received %ld bytes\n", bytesReceived);
+    if (bytesReceived < 0)
     {
-        perror("getsockopt failed");
+        perror("Failed to receive credentials");
+        exit(EXIT_FAILURE);
     }
-    else
+
+    struct cmsghdr *cmsgp;
+    for (cmsgp = CMSG_FIRSTHDR(&msgh); cmsgp != NULL; cmsgp = CMSG_NXTHDR(&msgh, cmsgp))
     {
-        printf("Client UID: %d, GID: %d, PID: %d\n", creds.uid, creds.gid, creds.pid);
+        printf("Server: Received control message type %d, level %d\n", cmsgp->cmsg_type, cmsgp->cmsg_level);
+
+        if (cmsgp->cmsg_level == SOL_SOCKET && cmsgp->cmsg_type == SCM_CREDENTIALS)
+        {
+            struct ucred *creds = (struct ucred *)CMSG_DATA(cmsgp);
+            printf("Received pid: %d\n", creds->pid);
+            printf("Received uid: %d\n", creds->uid);
+            printf("Received gid: %d\n", creds->gid);
+        }
     }
+
+    free(controlMsg);
+    close(client_fd);
 }
 
 int main() {
@@ -61,6 +74,9 @@ int main() {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
+
+    int enable = 1;
+    setsockopt(socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
 
     // Listen for incoming connections
     if (listen(socket_fd, 5) < 0) {
