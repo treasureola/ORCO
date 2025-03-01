@@ -31,22 +31,26 @@ int main(){
     
     printf("Connected to server\n");
 
-    // Send credentials to the server
-    struct ucred creds;
-    creds.pid = pid;
-    creds.uid = uid;
-    creds.gid = gid;
+    while (1){}    
 
-    struct msghdr msgh = {0};
+
+    // // Send credentials to the server
+    // struct ucred creds;
+    // creds.pid = pid;
+    // creds.uid = uid;
+    // creds.gid = gid;
+    // (void)creds;
+
+    // struct msghdr msgh = {0};
     
-    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
-    char *controlMsg = malloc(controlMsgSize);
-    msgh.msg_control = controlMsg;
-    msgh.msg_controllen = controlMsgSize;
+    // size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
+    // char *controlMsg = malloc(controlMsgSize);
+    // msgh.msg_control = controlMsg;
+    // msgh.msg_controllen = controlMsgSize;
 
-    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msgh);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_CREDENTIALS;
+    // struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msgh);
+    // cmsg->cmsg_level = SOL_SOCKET;
+    // cmsg->cmsg_type = SCM_CREDENTIALS;
 
     // Close the socket
     close(socket_fd);
