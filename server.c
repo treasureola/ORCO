@@ -26,7 +26,7 @@ void verify_client(int client_fd)
 {
     DEBUG_PRINT("Server: Client %d connected\n", client_fd);
 
-    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
+    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred)) + CMSG_SPACE(sizeof(int));
     char *controlMsg = malloc(controlMsgSize);
 
     struct msghdr msgh;
@@ -54,6 +54,7 @@ void verify_client(int client_fd)
     struct ucred *creds;
     for (cmsgp = CMSG_FIRSTHDR(&msgh); cmsgp != NULL; cmsgp = CMSG_NXTHDR(&msgh, cmsgp))
     {
+        DEBUG_PRINT("Message type %d\n", cmsgp->cmsg_type);
         switch (cmsgp->cmsg_type)
         {
         case SCM_CREDENTIALS:

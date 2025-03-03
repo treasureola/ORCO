@@ -9,8 +9,6 @@
  */
 int main(){
     // Initialize client data
-    int *fdTable = malloc(sizeof(int) * MAX_FILES);
-
     pid_t pid = getpid();
     uid_t uid = getuid();
     gid_t gid = getgid();
@@ -63,7 +61,7 @@ int main(){
     msgh.msg_iovlen = 1;
 
     // Allocate control message buffer
-    size_t fdTableSize = sizeof(int) * MAX_FILES;
+    size_t fdTableSize = sizeof(int);
     size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred)) + CMSG_SPACE(fdTableSize);
     char *controlMsg = malloc(controlMsgSize);
     if (!controlMsg)
@@ -94,6 +92,7 @@ int main(){
     cmsgp->cmsg_len = CMSG_LEN(fdTableSize);
 
     // Open the file to send
+    int *fdTable = malloc(fdTableSize);
     fdTable[0] = open("client.txt", O_RDONLY);
 
     // Copy the file descriptors into the control message
@@ -109,7 +108,7 @@ int main(){
 
     // Close the socket
     close(socket_fd);
-    
+
     free(controlMsg);
 
     return 0;
