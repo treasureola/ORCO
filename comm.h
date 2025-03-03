@@ -9,7 +9,17 @@
 #include <stdlib.h>     // For exit(), etc.
 #include <string.h>
 #include <poll.h>
+#include <fcntl.h>
 
 #define SOCKET_PATH "/tmp/socket"
 #define MAX_EVENTS 10
+#define MAX_FILES 10
+
+#define DEBUG_MODE
+#ifdef DEBUG_MODE
+    #define DEBUG_PRINT(fmt, ...) fprintf(stderr, "DEBUG:   " fmt, ##__VA_ARGS__)
+#else
+    #define DEBUG_PRINT(fmt, ...) // Do nothing when DEBUG_MODE is not defined
+#endif
+
 #endif
