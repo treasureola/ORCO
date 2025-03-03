@@ -117,6 +117,7 @@ int main() {
                     fds[nfds].fd = client_fd;
                     fds[nfds].events = POLLIN; // Monitor client for incoming data
                     nfds++;  // Increase the number of file descriptors being monitored
+                    printf("%s %d\n", "NEW CLIENT ACCEPTED", client_fd);
 
                 } else {
                     // If it's an existing client, read data
