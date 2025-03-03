@@ -1,6 +1,87 @@
 #include "comm.h"
 
 /*
+ * handle_client
+ *
+ * This function processes a client connection and populates the client's
+ * file descriptors given its credentials
+ */
+void handle_client(struct ucred *creds, int client_fd)
+{
+    pid_t pid = creds->pid;
+    uid_t uid = creds->uid;
+    gid_t gid = creds->gid;
+    (void)pid;
+    (void)uid;
+    (void)gid;
+    (void)client_fd;
+}
+
+/*
+ * verify_client
+ *
+ * This function verifies a client's credentials
+ */
+void verify_client(int client_fd)
+{
+    DEBUG_PRINT("Server: Client %d connected\n", client_fd);
+
+    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
+    char *controlMsg = malloc(controlMsgSize);
+
+    struct msghdr msgh;
+    memset(&msgh, 0, sizeof(struct msghdr));
+
+    char dummy;
+    struct iovec iov;
+    iov.iov_base = &dummy;
+    iov.iov_len = sizeof(dummy);
+
+    msgh.msg_iov = &iov;
+    msgh.msg_iovlen = 1;
+    msgh.msg_control = controlMsg;
+    msgh.msg_controllen = controlMsgSize;
+
+    ssize_t bytesReceived = recvmsg(client_fd, &msgh, 0);
+    DEBUG_PRINT("Server: Received %ld bytes\n", bytesReceived);
+    if (bytesReceived < 0 || bytesReceived == 0)
+    {
+        perror("Failed to receive credentials");
+        exit(EXIT_FAILURE);
+    }
+
+    struct cmsghdr *cmsgp;
+    struct ucred *creds;
+    for (cmsgp = CMSG_FIRSTHDR(&msgh); cmsgp != NULL; cmsgp = CMSG_NXTHDR(&msgh, cmsgp))
+    {
+        switch (cmsgp->cmsg_type)
+        {
+        case SCM_CREDENTIALS:
+            creds = (struct ucred *)CMSG_DATA(cmsgp);
+            DEBUG_PRINT("Received pid: %d\n", creds->pid);
+            DEBUG_PRINT("Received uid: %d\n", creds->uid);
+            DEBUG_PRINT("Received gid: %d\n", creds->gid);
+            break;
+        case SCM_RIGHTS:
+            int fdCnt = (cmsgp->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+            int *fdTable = (int *)CMSG_DATA(cmsgp);
+            for (int i = 0; i < fdCnt; i++)
+            {
+                DEBUG_PRINT("Received fd: %d\n", fdTable[i]);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    handle_client(creds, client_fd);
+
+    free(controlMsg);
+    close(client_fd);
+}
+
+/*
  * Server program
  * 
  *  This file simulates a server program that listens for incoming client
@@ -113,86 +194,4 @@ int main() {
     close(socket_fd);
     unlink(SOCKET_PATH);  // Clean up the socket file when done
     return 0;
-}
-
-
-/*
- * handle_client
- *
- * This function processes a client connection and populates the client's
- * file descriptors given its credentials
- */
-void handle_client(struct ucred *creds, int client_fd)
-{
-    pid_t pid = creds->pid;
-    uid_t uid = creds->uid;
-    gid_t gid = creds->gid;
-    (void)pid;
-    (void)uid;
-    (void)gid;
-    (void)client_fd;
-}
-
-/*
- * verify_client
- *
- * This function verifies a client's credentials
- */
-void verify_client(int client_fd)
-{
-    DEBUG_PRINT("Server: Client %d connected\n", client_fd);
-
-    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
-    char *controlMsg = malloc(controlMsgSize);
-
-    struct msghdr msgh;
-    memset(&msgh, 0, sizeof(struct msghdr));
-
-    char dummy;
-    struct iovec iov;
-    iov.iov_base = &dummy;
-    iov.iov_len = sizeof(dummy);
-
-    msgh.msg_iov = &iov;
-    msgh.msg_iovlen = 1;
-    msgh.msg_control = controlMsg;
-    msgh.msg_controllen = controlMsgSize;
-
-    ssize_t bytesReceived = recvmsg(client_fd, &msgh, 0);
-    DEBUG_PRINT("Server: Received %ld bytes\n", bytesReceived);
-    if (bytesReceived < 0 || bytesReceived == 0)
-    {
-        perror("Failed to receive credentials");
-        exit(EXIT_FAILURE);
-    }
-
-    struct cmsghdr *cmsgp;
-    struct ucred *creds;
-    for (cmsgp = CMSG_FIRSTHDR(&msgh); cmsgp != NULL; cmsgp = CMSG_NXTHDR(&msgh, cmsgp))
-    {
-        switch (cmsgp->cmsg_type)
-        {
-        case SCM_CREDENTIALS:
-            creds = (struct ucred *)CMSG_DATA(cmsgp);
-            DEBUG_PRINT("Received pid: %d\n", creds->pid);
-            DEBUG_PRINT("Received uid: %d\n", creds->uid);
-            DEBUG_PRINT("Received gid: %d\n", creds->gid);
-            break;
-        case SCM_RIGHTS:
-            int fdCnt = (cmsgp->cmsg_len - CMSG_LEN(0)) / sizeof(int);
-            int *fdTable = (int *)CMSG_DATA(cmsgp);
-            for (int i = 0; i < fdCnt; i++)
-            {
-                DEBUG_PRINT("Received fd: %d\n", fdTable[i]);
-            }
-            break;
-        default:
-            break;
-        }
-    }
-
-    handle_client(creds, client_fd);
-
-    free(controlMsg);
-    close(client_fd);
 }
