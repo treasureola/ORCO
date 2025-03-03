@@ -1,4 +1,4 @@
-// To test multiple client connecting to the server
+// To test 2 client connecting to the server
 
 #include "comm.h"
 
@@ -32,9 +32,9 @@ int connect(){
     
     // Send credentials to the server : these are fake credentials for the purpose of testing
     struct ucred creds;
-    creds.pid = 9999;
-    creds.uid = 9999;
-    creds.gid = 9999;
+    creds.pid = pid;
+    creds.uid = uid;
+    creds.gid = gid;
 
     struct msghdr msgh;
     memset(&msgh, 0, sizeof(struct msghdr));
@@ -102,6 +102,7 @@ int main(){
         client_connect = connect();
         if(client_connect != 0){
             printf(stderr, "%s\n", strerror(errno));
+            printf("Test 2: FAILED");
         }
         exit(0);
     }else{
@@ -110,10 +111,12 @@ int main(){
         client_connect = connect();
         if(client_connect != 0){
             printf(stderr, "%s\n", strerror(errno));
+            printf("Test 2: FAILED");
         }
         wait(NULL);
         printf("The child process is finished");
     }
 
+    printf("Test 2: PASSED");
     return 0;
 }
