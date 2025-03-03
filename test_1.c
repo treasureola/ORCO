@@ -1,3 +1,5 @@
+// To test sending fake credentials to the server
+
 #include "comm.h"
 
 int main(){
