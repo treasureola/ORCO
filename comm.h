@@ -9,6 +9,7 @@
 #include <stdlib.h>     // For exit(), etc.
 #include <string.h>
 #include <poll.h>
+#include <errno.h>
 
 #define SOCKET_PATH "/tmp/socket"
 #define MAX_EVENTS 10
