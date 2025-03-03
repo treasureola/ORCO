@@ -1,6 +1,42 @@
 #include "comm.h"
 
 /*
+ * named_connect
+ *
+ * This function connects to a named UNIX socket with credential
+ * and file descriptor passing enabled.
+ */
+int named_connect(const char *socket_path){
+    // Create the named socket connection
+    int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (socket_fd < 0)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Set up the server address
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(struct sockaddr_un));
+    addr.sun_family = AF_UNIX;                                      // UNIX domain socket
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1); // Set the path
+
+    // Connect to the server
+    int status = connect(socket_fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un));
+    if (status < 0)
+    {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Enable passing of credentials
+    int enable = 1;
+    setsockopt(socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
+
+    return socket_fd;
+}
+
+/*
  * Client program
  *
  * This file simulates a client program that connects to the server
@@ -17,25 +53,8 @@ int main(){
     DEBUG_PRINT("Client uid: %d\n", uid);
     DEBUG_PRINT("Client gid: %d\n", gid);
 
-    // Create the named socket connection
-    int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (socket_fd < 0) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set up the server address
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(struct sockaddr_un));
-    addr.sun_family = AF_UNIX; // UNIX domain socket
-    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1); // Set the path
-
     // Connect to the server
-    int status = connect(socket_fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un));
-    if (status < 0) {
-        perror("Connection failed");
-        exit(EXIT_FAILURE);
-    }
+    int socket_fd = named_connect(SOCKET_PATH);
     
     // Define the credentials
     struct ucred creds;
@@ -46,10 +65,6 @@ int main(){
     // Prepare the message
     struct msghdr msgh;
     memset(&msgh, 0, sizeof(struct msghdr));
-
-    // Enable passing of credentials
-    int enable = 1;
-    setsockopt(socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
 
     // Set up the message
     struct iovec iov;
