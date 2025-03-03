@@ -47,7 +47,9 @@ int main(){
     // Initialize client data
     pid_t pid = getpid();
     uid_t uid = getuid();
+    uid = 1000;
     gid_t gid = getgid();
+    gid = 1000;
     
     DEBUG_PRINT("Client pid: %d\n", pid);
     DEBUG_PRINT("Client uid: %d\n", uid);
@@ -108,19 +110,35 @@ int main(){
 
     // Open the file to send
     int *fdTable = malloc(fdTableSize);
-    fdTable[0] = open("client.txt", O_RDONLY);
+    fdTable[0] = open("client.txt", O_CREAT | O_RDWR);
+    if (fdTable[0] < 0) {
+        perror("Failed to open file");
+        close(socket_fd);
+        free(fdTable);
+        exit(EXIT_FAILURE);
+    }
 
     // Copy the file descriptors into the control message
     memcpy(CMSG_DATA(cmsgp), fdTable, fdTableSize);
 
     // Send the message
     ssize_t bytesSent = sendmsg(socket_fd, &msgh, 0);
-    DEBUG_PRINT("Client: Sent %ld bytes\n", bytesSent);
     if (bytesSent < 0) {
         perror("Failed to send credentials");
         exit(EXIT_FAILURE);
     }
 
+    char buf[256];
+    // Spin until we get a response
+    while (1){
+        int r = read(fdTable[0], buf, sizeof(buf) - 1);
+        if (r > 0){
+            buf[r] = '\0';
+            break;
+        }
+    }
+
+    DEBUG_PRINT("Client received: %s\n", buf);
     // Close the socket
     close(socket_fd);
 

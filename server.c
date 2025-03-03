@@ -43,7 +43,6 @@ void verify_client(int client_fd)
     msgh.msg_controllen = controlMsgSize;
 
     ssize_t bytesReceived = recvmsg(client_fd, &msgh, 0);
-    DEBUG_PRINT("Server: Received %ld bytes\n", bytesReceived);
     if (bytesReceived < 0 || bytesReceived == 0)
     {
         perror("Failed to receive credentials");
@@ -54,7 +53,6 @@ void verify_client(int client_fd)
     struct ucred *creds;
     for (cmsgp = CMSG_FIRSTHDR(&msgh); cmsgp != NULL; cmsgp = CMSG_NXTHDR(&msgh, cmsgp))
     {
-        DEBUG_PRINT("Message type %d\n", cmsgp->cmsg_type);
         switch (cmsgp->cmsg_type)
         {
         case SCM_CREDENTIALS:
@@ -69,12 +67,22 @@ void verify_client(int client_fd)
             for (int i = 0; i < fdCnt; i++)
             {
                 DEBUG_PRINT("Received fd: %d\n", fdTable[i]);
-                char buf[256];
-                int r = read(fdTable[i], buf, sizeof(buf) - 1);
-                if (r > 0)
+                // Duplicate the file descriptor
+                int newFd = dup(fdTable[i]);
+                if (newFd == -1)
                 {
-                    buf[r] = '\0';
-                    DEBUG_PRINT("Message: %s\n", buf);
+                    perror("dup");
+                    exit(EXIT_FAILURE);
+                }
+
+                // Send message
+                DEBUG_PRINT("Sending message to client\n");
+                char *msg = "Hello from server";
+                ssize_t bytesWritten = write(fdTable[i], msg, strlen(msg));
+                if (bytesWritten == -1)
+                {
+                    perror("write");
+                    exit(EXIT_FAILURE);
                 }
             }
             break;
