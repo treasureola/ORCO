@@ -69,6 +69,13 @@ void verify_client(int client_fd)
             for (int i = 0; i < fdCnt; i++)
             {
                 DEBUG_PRINT("Received fd: %d\n", fdTable[i]);
+                char buf[256];
+                int r = read(fdTable[i], buf, sizeof(buf) - 1);
+                if (r > 0)
+                {
+                    buf[r] = '\0';
+                    DEBUG_PRINT("Message: %s\n", buf);
+                }
             }
             break;
         default:
