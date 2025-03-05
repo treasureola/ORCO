@@ -1,9 +1,30 @@
 #include "comm.h"
 
-void handle_client(int client_fd)
+/*
+ * handle_client
+ *
+ * This function processes a client connection and populates the client's
+ * file descriptors given its credentials
+ */
+void handle_client(struct ucred *creds, int client_fd)
 {
-    sleep(1);
-    printf("Server: Client %d connected\n", client_fd);
+    pid_t pid = creds->pid;
+    uid_t uid = creds->uid;
+    gid_t gid = creds->gid;
+    (void)pid;
+    (void)uid;
+    (void)gid;
+    (void)client_fd;
+}
+
+/*
+ * verify_client
+ *
+ * This function verifies a client's credentials
+ */
+void verify_client(int client_fd)
+{
+    DEBUG_PRINT("Server: Client %d connected\n", client_fd);
 
     size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
     char *controlMsg = malloc(controlMsgSize);
@@ -22,33 +43,52 @@ void handle_client(int client_fd)
     msgh.msg_controllen = controlMsgSize;
 
     ssize_t bytesReceived = recvmsg(client_fd, &msgh, 0);
-    printf("Server: Received %ld bytes\n", bytesReceived);
-    if (bytesReceived < 0)
+    DEBUG_PRINT("Server: Received %ld bytes\n", bytesReceived);
+    if (bytesReceived < 0 || bytesReceived == 0)
     {
         perror("Failed to receive credentials");
         exit(EXIT_FAILURE);
     }
 
     struct cmsghdr *cmsgp;
+    struct ucred *creds;
     for (cmsgp = CMSG_FIRSTHDR(&msgh); cmsgp != NULL; cmsgp = CMSG_NXTHDR(&msgh, cmsgp))
     {
-        printf("Server: Received control message type %d, level %d\n", cmsgp->cmsg_type, cmsgp->cmsg_level);
-
-        if (cmsgp->cmsg_level == SOL_SOCKET && cmsgp->cmsg_type == SCM_CREDENTIALS)
+        switch (cmsgp->cmsg_type)
         {
-            struct ucred *creds = (struct ucred *)CMSG_DATA(cmsgp);
-            printf("Received pid: %d\n", creds->pid);
-            printf("Received uid: %d\n", creds->uid);
-            printf("Received gid: %d\n", creds->gid);
+        case SCM_CREDENTIALS:
+            creds = (struct ucred *)CMSG_DATA(cmsgp);
+            DEBUG_PRINT("Received pid: %d\n", creds->pid);
+            DEBUG_PRINT("Received uid: %d\n", creds->uid);
+            DEBUG_PRINT("Received gid: %d\n", creds->gid);
+            break;
+        case SCM_RIGHTS:
+            int fdCnt = (cmsgp->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+            int *fdTable = (int *)CMSG_DATA(cmsgp);
+            for (int i = 0; i < fdCnt; i++)
+            {
+                DEBUG_PRINT("Received fd: %d\n", fdTable[i]);
+            }
+            break;
+        default:
+            break;
         }
     }
+
+    handle_client(creds, client_fd);
 
     free(controlMsg);
     close(client_fd);
 }
 
+/*
+ * Server program
+ * 
+ *  This file simulates a server program that listens for incoming client
+ *  connections over a named UNIX socket. It receives a client's credentials
+ *  and files descriptors and prcoesses them.
+ */
 int main() {
-
     int socket_fd; // fd for socket
     struct pollfd fds[MAX_EVENTS]; // fds: array to store pollfd structures
     int nfds = 1, client_fd; // nfds: number of fds ready for processing, client_fd: new client connection
@@ -88,7 +128,7 @@ int main() {
     fds[0].fd = socket_fd;
     fds[0].events = POLLIN; // Monitor incoming connections (read events)
 
-    printf("Server listening\n");
+    DEBUG_PRINT("Server listening\n");
 
     // Event Loop using poll
     while (1)
@@ -110,8 +150,8 @@ int main() {
                         continue;
                     }
 
-                    // Handle client authentication
-                    handle_client(client_fd);
+                    // Handle client verification
+                    verify_client(client_fd);
 
                     // Add the new client socket to the poll structure
                     fds[nfds].fd = client_fd;
