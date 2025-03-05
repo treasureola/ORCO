@@ -15,6 +15,15 @@
 #define SOCKET_PATH "/tmp/socket"
 #define MAX_EVENTS 10
 #define MAX_FILES 10
+#define MAX_CLIENTS 10
+
+typedef struct Client
+{
+    int socket;
+    // struct sockaddr_in address;
+    int fd;
+} Client;
+
 
 #define DEBUG_MODE
 #ifdef DEBUG_MODE

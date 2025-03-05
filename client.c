@@ -128,13 +128,24 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
+    
+    DEBUG_PRINT("Sending message to server\n");
+    DEBUG_PRINT("File descriptor %d\n", fdTable[0]);
+    char *msg = "Hello from client";
+    ssize_t bytesWritten = write(fdTable[0], msg, strlen(msg));
+    if (bytesWritten == -1)
+    {
+        perror("write");
+        exit(EXIT_FAILURE);
+    }
+
+    // Spin until we get a response from the server
+    DEBUG_PRINT("Receiving message from server\n");
     char buf[256];
-    // Spin until we get a response
     while (1){
-        DEBUG_PRINT("file descriptor: %d\n", fdTable[0]);
         int r = read(fdTable[0], buf, sizeof(buf) - 1);
         if (r == 0){
-            DEBUG_PRINT("Client received 0 bytes");
+            DEBUG_PRINT("Client received 0 bytes\n");
             break;
         }
             
@@ -142,9 +153,11 @@ int main(){
             buf[r] = '\0';
             break;
         }
+    
     }
-
     DEBUG_PRINT("Client received: %s\n", buf);
+    close(fdTable[0]);
+    
     // Close the socket
     close(socket_fd);
 
