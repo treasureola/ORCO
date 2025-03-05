@@ -2,7 +2,7 @@
 
 #include "comm.h"
 
-int connect(){
+int connect_1(){
     pid_t pid = getpid();
     uid_t uid = getuid();
     gid_t gid = getgid();
@@ -99,24 +99,25 @@ int main(){
     }else if(pid == 0){
         // Child process
         int client_connect;
-        client_connect = connect();
+        client_connect = connect_1();
         if(client_connect != 0){
-            printf(stderr, "%s\n", strerror(errno));
+            // printf(stderr, "%s\n", strerror(errno));
             printf("Test 2: FAILED");
         }
         exit(0);
     }else{
         // Parent process
         int client_connect;
-        client_connect = connect();
+        client_connect = connect_1();
         if(client_connect != 0){
-            printf(stderr, "%s\n", strerror(errno));
+            // printf(stderr, "%s\n", strerror(errno));
             printf("Test 2: FAILED");
         }
-        wait(NULL);
-        printf("The child process is finished");
+        int status;
+        wait(&status);
+        printf("The child process is finished \n");
     }
 
-    printf("Test 2: PASSED");
+    printf("Test 2: PASSED \n");
     return 0;
 }
