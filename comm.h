@@ -23,3 +23,11 @@
 #endif
 
 #endif
+
+typedef struct {
+    int acces_code; //the access code of the user
+    char *action; // To read or write
+    char *filename;  // file the user wnats to read or wort to
+    char write_string; // IF write, the data the user wants to worite to the file
+    int read_bytes; //If read, the number of bytes the user wants to read
+}Request;

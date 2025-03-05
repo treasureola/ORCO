@@ -17,6 +17,27 @@ void handle_client(struct ucred *creds, int client_fd)
     (void)client_fd;
 }
 
+void handle_request(Request request){
+    int files[3] = {"file1.txt", "file2.txt", "file3.txt"};
+    for (int i=0; i<=request.acces_code; i++){
+        if (request.filename == files[i]){
+            if (request.action == "Write"){ //if the 
+                FILE *file = fopen(request.filename, "w");
+                fprintf(file, request.write_string);
+                fclose(file);
+            } else {
+                FILE *file = fopen(request.filename, "r");
+                char buffer[request.read_bytes + 1];
+                size_t bytes_read = (buffer, 1, request.read_bytes, file);
+                buffer[bytes_read] = '\0'; // Null-terminate for printing as a string
+                fclose(file);
+            }
+        } else {
+            perror("ACCESS TO FILE DENIED");
+        }
+    }
+}
+
 /*
  * verify_client
  *

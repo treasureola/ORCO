@@ -1,5 +1,7 @@
 #include "comm.h"
 
+// TODO 
+    // Write a function that handles sserver request where after client 
 /*
  * Client program
  *
@@ -7,6 +9,19 @@
  * over a named UNIX socket. It sends its credentials and file descriptors
  * across the socket to the server. 
  */
+
+void populate_request(int fd, int access_code, char *action, char *filename, char *write_string, int *read_bytes){
+    Request request;
+    // Request request = {access_code, action, filename, write_string, read_bytes};
+    request.acces_code = access_code;  //Assign the user access code input
+    request.action = action; // Assign the User action (read or write)
+    request.filename = filename; //Assign the user filename
+    request.write_string = write_string;
+    request.read_bytes = read_bytes;
+    //Write to the fd
+    // write(fd, &request, sizeof(Request));
+}
+
 int main(){
     // Initialize client data
     int *fdTable = malloc(sizeof(int) * MAX_FILES);
