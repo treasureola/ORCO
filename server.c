@@ -76,6 +76,7 @@ void verify_client(int client_fd)
                 }
 
                 // Send message
+                DEBUG_PRINT("file descriptor: %d\n", fdTable[i]);
                 DEBUG_PRINT("Sending message to client\n");
                 char *msg = "Hello from server";
                 ssize_t bytesWritten = write(fdTable[i], msg, strlen(msg));

@@ -131,7 +131,13 @@ int main(){
     char buf[256];
     // Spin until we get a response
     while (1){
+        DEBUG_PRINT("file descriptor: %d\n", fdTable[0]);
         int r = read(fdTable[0], buf, sizeof(buf) - 1);
+        if (r == 0){
+            DEBUG_PRINT("Client received 0 bytes");
+            break;
+        }
+            
         if (r > 0){
             buf[r] = '\0';
             break;
