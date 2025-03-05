@@ -10,6 +10,7 @@
 #include <string.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <sys/wait.h>
 
 #define SOCKET_PATH "/tmp/socket"
 #define MAX_EVENTS 10
