@@ -1,22 +1,12 @@
 #include "comm.h"
 
 /*
- * handle_client
- *
- * This function processes a client connection and populates the client's
- * file descriptors given its credentials
+ * Server program
+ * 
+ *  This file simulates a server program that listens for incoming client
+ *  connections over a named UNIX socket. It receives a client's credentials
+ *  and files descriptors and prcoesses them.
  */
-void handle_client(struct ucred *creds, int client_fd)
-{
-    pid_t pid = creds->pid;
-    uid_t uid = creds->uid;
-    gid_t gid = creds->gid;
-    (void)pid;
-    (void)uid;
-    (void)gid;
-    (void)client_fd;
-
-}
 
 void handle_request(Request request, int fd){
     char *files[3] = {"file1.txt", "file2.txt", "file3.txt"};
@@ -54,7 +44,7 @@ void handle_request(Request request, int fd){
  *
  * This function verifies a client's credentials
  */
-void verify_client(int client_fd)
+int verify_client(int client_fd)
 {
     DEBUG_PRINT("Server: Client %d connected\n", client_fd);
 
@@ -78,7 +68,7 @@ void verify_client(int client_fd)
     if (bytesReceived < 0 || bytesReceived == 0)
     {
         perror("Failed to receive credentials");
-        exit(EXIT_FAILURE);
+        return FALSE;
     }
 
     struct cmsghdr *cmsgp;
@@ -104,13 +94,15 @@ void verify_client(int client_fd)
                 if (newFd == -1)
                 {
                     perror("dup");
-                    exit(EXIT_FAILURE);
+                    return FALSE;
                 }
             }
             break;
         default:
             break;
         }
+
+        return TRUE;
     }
 
     // handle_client(creds, client_fd);
@@ -120,54 +112,114 @@ void verify_client(int client_fd)
     return;
 }
 
-/*
- * Server program
- * 
- *  This file simulates a server program that listens for incoming client
- *  connections over a named UNIX socket. It receives a client's credentials
- *  and files descriptors and prcoesses them.
- */
-int main() {
-    int socket_fd; // fd for socket
-    struct pollfd fds[MAX_EVENTS]; // fds: array to store pollfd structures
-    memset(fds, -1, sizeof(fds));
-    int nfds = 1, client_fd; // nfds: number of fds ready for processing, client_fd: new client connection
-    // char buffer[1024] = {0};
-
+void setup_socket(int *socket_fd, struct sockaddr_un **addr) {
     // Create the socket
-    socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (socket_fd == -1) {
+    *socket_fd = socket(AF_UNIX, SOCK_STREAM, 0); 
+    if (*socket_fd == -1) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
     unlink(SOCKET_PATH);
 
-    struct sockaddr_un *addr = malloc(sizeof(struct sockaddr_un));
-    memset(addr, 0, sizeof(struct sockaddr_un));
+    *addr = malloc(sizeof(struct sockaddr_un));
+    memset(*addr, 0, sizeof(struct sockaddr_un));
 
-    addr->sun_family = AF_UNIX;
-    strncpy(addr->sun_path, SOCKET_PATH, sizeof(addr->sun_path) - 1);
+    (*addr)->sun_family = AF_UNIX;
+    strncpy((*addr)->sun_path, SOCKET_PATH, sizeof((*addr)->sun_path) - 1);
 
-    unlink(SOCKET_PATH);
     // Bind the socket
-    if (bind(socket_fd, (struct sockaddr *)addr, sizeof(struct sockaddr_un)) < 0) {
+    if (bind(*socket_fd, (struct sockaddr *)*addr, sizeof(struct sockaddr_un)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
     int enable = 1;
-    setsockopt(socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
+    setsockopt(*socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
 
-    // Listen for incoming connections
-    if (listen(socket_fd, 5) < 0) {
+    if (listen(*socket_fd, 5) < 0) {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
+}
 
-    // Set up the poll structure for the listening socket
-    fds[0].fd = socket_fd;
-    fds[0].events = POLLIN; // Monitor incoming connections (read events)
+void accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
+    int client_fd; //client_fd: new client connection
+
+    if ((client_fd = accept(socket_fd, NULL, NULL)) < 0) {
+        perror("accept failed");
+        exit(EXIT_FAILURE);
+    }
+    printf("New connection, socket fd is %d\n", client_fd);
+
+
+    int client_idx = 0;
+    // Add new socket to pollfd array
+    for (int i = 1; i <= MAX_CLIENTS; i++) {
+        if (fds[i].fd == -1) {
+            fds[i].fd = client_fd;
+            fds[i].events = POLLIN;
+            client_idx = i;
+            break;
+        }
+    }
+
+    if (!client_idx) {
+        close(client_fd);
+        DEBUG_PRINT("Client fd: %d rejected (max clients reached)\n", client_fd);
+        return;
+    }
+    
+    int success = verify_client(client_fd);
+    if (!success) {
+        close(client_fd);
+        DEBUG_PRINT("Client fd: %d rejected (verify failed)\n", client_fd);
+        fds[client_idx].fd = -1;
+        return;
+    }
+
+    DEBUG_PRINT("Client fd: %d accepted\n", client_fd);
+}
+
+void handle_client_connections(struct pollfd *fds) {
+    for (int i = 1; i <= MAX_CLIENTS; i++) {
+        if (fds[i].fd > 0 && fds[i].revents & POLLIN) {
+            Request request;
+            int valread = read(fds[i].fd, &request, sizeof(Request));
+            if (valread == 0) {
+                // Client disconnected
+                printf("Client disconnected, socket fd is %d\n", fds[i].fd);
+                close(fds[i].fd);
+                fds[i].fd = -1;
+            } else if (valread < 0) {
+                perror("read failed");
+                close(fds[i].fd);
+                fds[i].fd = -1;
+            } else {
+                // Process client request
+                DEBUG_PRINT("Reading incoming request from client\n");
+                DEBUG_PRINT("Reading from fd: %d\n", fds[i].fd);
+                DEBUG_PRINT("read %d bytes\n", valread);
+                handle_request(request, fds[i].fd);
+                DEBUG_PRINT("Request handled\n");
+                close(fds[i].fd);
+            }
+        }
+    }
+}
+
+int main() {
+    int socket_fd; // fd for socket
+    struct sockaddr_un *addr; 
+    struct pollfd fds[MAX_EVENTS]; // fds: array to store pollfd structures
+    memset(fds, -1, sizeof(fds));
+    int nfds = 1; // nfds: number of fds ready for processing
+
+    setup_socket(&socket_fd, &addr);
+
+   // Set up the poll structure for the listening socket
+   fds[0].fd = socket_fd;
+   fds[0].events = POLLIN; // Monitor incoming connections (read events)
 
     DEBUG_PRINT("Server listening\n");
 
@@ -182,53 +234,14 @@ int main() {
 
         // New connection
         if (fds[0].revents & POLLIN) {
-            if ((client_fd = accept(socket_fd, NULL, NULL)) < 0) {
-                perror("accept failed");
-                exit(EXIT_FAILURE);
-            }
-            printf("New connection, socket fd is %d\n", client_fd);
-
-            // Add new socket to pollfd array
-            for (int i = 1; i <= MAX_CLIENTS; i++) {
-                if (fds[i].fd == -1) {
-                    fds[i].fd = client_fd;
-                    fds[i].events = POLLIN;
-                    break;
-                }
-            }
-            verify_client(client_fd);
-            DEBUG_PRINT("Cleint fd: %d accepted\n", client_fd);
+            accept_new_connection(socket_fd, fds, &nfds);
         }
 
         // Handle client connections
-        for (int i = 1; i <= MAX_CLIENTS; i++) {
-            if (fds[i].fd > 0 && fds[i].revents & POLLIN) {
-                // int valread = read(fds[i].fd, buffer, 1024);
-                Request request;
-                int valread = read(fds[i].fd, &request, sizeof(Request));
-                if (valread == 0) {
-                    // Client disconnected
-                    printf("Client disconnected, socket fd is %d\n", fds[i].fd);
-                    close(fds[i].fd);
-                    fds[i].fd = -1;
-                } else if (valread < 0) {
-                    perror("read failed");
-                    close(fds[i].fd);
-                    fds[i].fd = -1;
-                } else {
-                    // Process client request
-                    DEBUG_PRINT("Reading incoming request from client\n");
-                    DEBUG_PRINT("Helloo\n");
-                    DEBUG_PRINT("Reading from fd: %d\n", fds[i].fd);
-                    DEBUG_PRINT("read %d bytes\n", valread);
-                    handle_request(request, fds[i].fd);
-                    DEBUG_PRINT("Request handled\n");
-                    close(fds[i].fd);
-                }
-            }
-        }
+        handle_client_connections(fds);
     }
+
     close(socket_fd);
-    unlink(SOCKET_PATH);  // Clean up the socket file when done
+    unlink(SOCKET_PATH); // Clean up the socket file when done
     return 0;
 }

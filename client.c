@@ -70,9 +70,7 @@ int main(){
     // Initialize client data
     pid_t pid = getpid();
     uid_t uid = getuid();
-    uid = 1000;
     gid_t gid = getgid();
-    gid = 1000;
     
     DEBUG_PRINT("Client pid: %d\n", pid);
     DEBUG_PRINT("Client uid: %d\n", uid);

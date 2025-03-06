@@ -1,6 +1,8 @@
 #ifndef H_ORCO_COMMON
 #define H_ORCO_COMMON
 #define _GNU_SOURCE
+#define TRUE 1
+#define FALSE 0
 #include <sys/socket.h> // For socket(), sendmsg(), recvmsg(), and SCM_CREDENTIALS
 #include <sys/types.h>  // For pid_t, uid_t, etc.
 #include <sys/un.h>
