@@ -19,27 +19,34 @@ void handle_client(struct ucred *creds, int client_fd)
 }
 
 void handle_request(Request request, int fd){
-    int files[3] = {"file1.txt", "file2.txt", "file3.txt"};
-    for (int i=0; i<=request.acces_code; i++){
-        if (request.filename == files[i]){
-            if (request.action == "Write"){ //if the 
+    char *files[3] = {"file1.txt", "file2.txt", "file3.txt"};
+    DEBUG_PRINT("In handle_request\n");
+    DEBUG_PRINT("%s\n", request.filename);
+    for (int i=0; i<request.acces_code; i++){
+        if (strcmp(request.filename , files[i])==0){
+            if (strcmp(request.action, "Write") == 0){
+                DEBUG_PRINT("Recieved write command\n");
                 FILE *file = fopen(request.filename, "w");
-                fprintf(file, request.write_string);
+                fprintf(file, "%s\n",request.write_string);
                 char *ret = "DONE: DATA HAS BEEN WRITTEN INTO THE FILE";
                 send(fd, ret, strlen(ret), 0);
-                fclose(file);
+                fclose(file);  
+                return; 
             } else {
-                FILE *file = fopen(request.filename, "r");
+                DEBUG_PRINT("Recieved read command\n");
+                int file_fd = open(request.filename, O_RDONLY);
                 char buffer[request.read_bytes + 1];
-                size_t bytes_read = (buffer, 1, request.read_bytes, file);
+                size_t bytes_read = read(file_fd, &buffer, request.read_bytes);
                 buffer[bytes_read] = '\0'; // Null-terminate for printing as a string
                 send(fd, buffer, strlen(buffer), 0);
-                fclose(file);
+                close(file_fd);
+                return;
             }
-        } else {
-            perror("ACCESS TO FILE DENIED");
-        }
+        } 
     }
+    char *ret = "ACCESS DEINED\n";
+    send(fd, ret, strlen(ret), 0);
+    return;
 }
 
 /*
@@ -125,7 +132,7 @@ int main() {
     struct pollfd fds[MAX_EVENTS]; // fds: array to store pollfd structures
     memset(fds, -1, sizeof(fds));
     int nfds = 1, client_fd; // nfds: number of fds ready for processing, client_fd: new client connection
-    char buffer[1024] = {0};
+    // char buffer[1024] = {0};
 
     // Create the socket
     socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -196,7 +203,9 @@ int main() {
         // Handle client connections
         for (int i = 1; i <= MAX_CLIENTS; i++) {
             if (fds[i].fd > 0 && fds[i].revents & POLLIN) {
-                int valread = read(fds[i].fd, buffer, 1024);
+                // int valread = read(fds[i].fd, buffer, 1024);
+                Request request;
+                int valread = read(fds[i].fd, &request, sizeof(Request));
                 if (valread == 0) {
                     // Client disconnected
                     printf("Client disconnected, socket fd is %d\n", fds[i].fd);
@@ -208,16 +217,12 @@ int main() {
                     fds[i].fd = -1;
                 } else {
                     // Process client request
-                    Request request;
-                    // buffer[valread] = '\0';
-                    printf("Received from client %d: %s\n", fds[i].fd, buffer);
-                    int bytes_read = recv(fds[i].fd, &request, sizeof(Request), 0);
-                    if (bytes_read < 0){
-                        perror("Send failed");
-                        exit(1);
-                    }
+                    DEBUG_PRINT("Reading incoming request from client\n");
+                    DEBUG_PRINT("Helloo\n");
+                    DEBUG_PRINT("Reading from fd: %d\n", fds[i].fd);
+                    DEBUG_PRINT("read %d bytes\n", valread);
                     handle_request(request, fds[i].fd);
-                    // send(fds[i].fd, buffer, strlen(buffer), 0);
+                    DEBUG_PRINT("Request handled\n");
                     close(fds[i].fd);
                 }
             }

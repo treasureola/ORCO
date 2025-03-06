@@ -36,8 +36,8 @@ typedef struct Client
 
 typedef struct {
     int acces_code; //the access code of the user
-    char *action; // To read or write
-    char *filename;  // file the user wnats to read or wort to
-    char write_string; // IF write, the data the user wants to worite to the file
+    char action[50]; // To read or write
+    char filename[128];  // file the user wnats to read or wort to
+    char write_string[1024]; // IF write, the data the user wants to worite to the file
     int read_bytes; //If read, the number of bytes the user wants to read
 }Request;

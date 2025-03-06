@@ -46,19 +46,24 @@ int named_connect(const char *socket_path){
  * across the socket to the server. 
  */
 
-void populate_request(int fd, int access_code, char *action, char *filename, char *write_string, int *read_bytes){
+void populate_request(int fd, int access_code, char * action, char* filename, char * write_string, int read_bytes){
     Request request;
     // Request request = {access_code, action, filename, write_string, read_bytes};
+    
     request.acces_code = access_code;  //Assign the user access code input
-    request.action = action; // Assign the User action (read or write)
-    request.filename = filename; //Assign the user filename
-    request.write_string = write_string;
+    strcpy(request.action, action);
+    strcpy(request.filename, filename);
+    if (write_string != NULL){
+        strcpy(request.write_string, write_string);
+    }
     request.read_bytes = read_bytes;
     int send_byte = send(fd, &request, sizeof(Request),0);
     if (send_byte < 0) {
         perror("Send failed");
         exit(1);
     }
+    DEBUG_PRINT("sent %d bytes to the server\n", send_byte);
+    return;
 }
 
 int main(){
@@ -149,18 +154,7 @@ int main(){
     close(fdTable[0]);
 
     DEBUG_PRINT("Sending message to server\n");
-
-    char message[] = "Hello from client!\n";
-    // int sent_byte = send(socket_fd, message, strlen(message), 0);
-
-    // if (sent_byte < 0) {
-
-    //     perror("Send failed");
-
-    //     exit(1);
-
-    // }
-    populate_request(socket_fd, 2, "Read", "file1.txt", NULL, 10);
+    populate_request(socket_fd, 2, "Write", "file2.txt", "HI HI HI", 0);
 
     DEBUG_PRINT("Message sent to server\n");
 
