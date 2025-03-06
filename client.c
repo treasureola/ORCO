@@ -102,7 +102,7 @@ int main(){
     // Copy the credentials into the control message
     memcpy(CMSG_DATA(cmsgp), &creds, sizeof(struct ucred));
 
-    // Populate the second header (file descriptors)
+    // // Populate the second header (file descriptors)
     cmsgp = CMSG_NXTHDR(&msgh, cmsgp);
     cmsgp->cmsg_level = SOL_SOCKET;
     cmsgp->cmsg_type = SCM_RIGHTS;
@@ -118,7 +118,7 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
-    // Copy the file descriptors into the control message
+    // // Copy the file descriptors into the control message
     memcpy(CMSG_DATA(cmsgp), fdTable, fdTableSize);
 
     // Send the message
@@ -128,35 +128,35 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
-    
+    close(fdTable[0]);
+
     DEBUG_PRINT("Sending message to server\n");
-    DEBUG_PRINT("File descriptor %d\n", fdTable[0]);
-    char *msg = "Hello from client";
-    ssize_t bytesWritten = write(fdTable[0], msg, strlen(msg));
-    if (bytesWritten == -1)
-    {
-        perror("write");
-        exit(EXIT_FAILURE);
+
+    char message[] = "Hello from client!\n";
+    int sent_byte = send(socket_fd, message, strlen(message), 0);
+
+    if (sent_byte < 0) {
+
+        perror("Send failed");
+
+        exit(1);
+
     }
 
-    // Spin until we get a response from the server
-    DEBUG_PRINT("Receiving message from server\n");
-    char buf[256];
-    while (1){
-        int r = read(fdTable[0], buf, sizeof(buf) - 1);
-        if (r == 0){
-            DEBUG_PRINT("Client received 0 bytes\n");
-            break;
-        }
-            
-        if (r > 0){
-            buf[r] = '\0';
-            break;
-        }
-    
+    DEBUG_PRINT("Message sent to server\n");
+
+    // Now wait for a response from the server
+    char buffer[1024] = {0};
+    ssize_t response_len = read(socket_fd, buffer, sizeof(buffer) - 1);  // Use read to block and receive data
+    if (response_len < 0) {
+        perror("Failed to receive response from server");
+        exit(EXIT_FAILURE);
+    } else if (response_len == 0) {
+        printf("Server closed the connection\n");
+    } else {
+        buffer[response_len] = '\0';  // Null-terminate the received data
+        printf("Received response from server: %s\n", buffer);
     }
-    DEBUG_PRINT("Client received: %s\n", buf);
-    close(fdTable[0]);
     
     // Close the socket
     close(socket_fd);
