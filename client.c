@@ -54,8 +54,11 @@ void populate_request(int fd, int access_code, char *action, char *filename, cha
     request.filename = filename; //Assign the user filename
     request.write_string = write_string;
     request.read_bytes = read_bytes;
-    //Write to the fd
-    // write(fd, &request, sizeof(Request));
+    int send_byte = send(fd, &request, sizeof(Request),0);
+    if (send_byte < 0) {
+        perror("Send failed");
+        exit(1);
+    }
 }
 
 int main(){
@@ -148,15 +151,16 @@ int main(){
     DEBUG_PRINT("Sending message to server\n");
 
     char message[] = "Hello from client!\n";
-    int sent_byte = send(socket_fd, message, strlen(message), 0);
+    // int sent_byte = send(socket_fd, message, strlen(message), 0);
 
-    if (sent_byte < 0) {
+    // if (sent_byte < 0) {
 
-        perror("Send failed");
+    //     perror("Send failed");
 
-        exit(1);
+    //     exit(1);
 
-    }
+    // }
+    populate_request(socket_fd, 2, "Read", "file1.txt", NULL, 10);
 
     DEBUG_PRINT("Message sent to server\n");
 

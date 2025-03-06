@@ -18,19 +18,22 @@ void handle_client(struct ucred *creds, int client_fd)
 
 }
 
-void handle_request(Request request){
+void handle_request(Request request, int fd){
     int files[3] = {"file1.txt", "file2.txt", "file3.txt"};
     for (int i=0; i<=request.acces_code; i++){
         if (request.filename == files[i]){
             if (request.action == "Write"){ //if the 
                 FILE *file = fopen(request.filename, "w");
                 fprintf(file, request.write_string);
+                char *ret = "DONE: DATA HAS BEEN WRITTEN INTO THE FILE";
+                send(fd, ret, strlen(ret), 0);
                 fclose(file);
             } else {
                 FILE *file = fopen(request.filename, "r");
                 char buffer[request.read_bytes + 1];
                 size_t bytes_read = (buffer, 1, request.read_bytes, file);
                 buffer[bytes_read] = '\0'; // Null-terminate for printing as a string
+                send(fd, buffer, strlen(buffer), 0);
                 fclose(file);
             }
         } else {
@@ -205,9 +208,16 @@ int main() {
                     fds[i].fd = -1;
                 } else {
                     // Process client request
-                    buffer[valread] = '\0';
+                    Request request;
+                    // buffer[valread] = '\0';
                     printf("Received from client %d: %s\n", fds[i].fd, buffer);
-                    send(fds[i].fd, buffer, strlen(buffer), 0);
+                    int bytes_read = recv(fds[i].fd, &request, sizeof(Request), 0);
+                    if (bytes_read < 0){
+                        perror("Send failed");
+                        exit(1);
+                    }
+                    handle_request(request, fds[i].fd);
+                    // send(fds[i].fd, buffer, strlen(buffer), 0);
                     close(fds[i].fd);
                 }
             }
