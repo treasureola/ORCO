@@ -15,6 +15,7 @@ void handle_client(struct ucred *creds, int client_fd)
     (void)uid;
     (void)gid;
     (void)client_fd;
+
 }
 
 void handle_request(Request request){
@@ -47,7 +48,7 @@ void verify_client(int client_fd)
 {
     DEBUG_PRINT("Server: Client %d connected\n", client_fd);
 
-    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred));
+    size_t controlMsgSize = CMSG_SPACE(sizeof(struct ucred)) + CMSG_SPACE(sizeof(int));
     char *controlMsg = malloc(controlMsgSize);
 
     struct msghdr msgh;
@@ -64,7 +65,6 @@ void verify_client(int client_fd)
     msgh.msg_controllen = controlMsgSize;
 
     ssize_t bytesReceived = recvmsg(client_fd, &msgh, 0);
-    DEBUG_PRINT("Server: Received %ld bytes\n", bytesReceived);
     if (bytesReceived < 0 || bytesReceived == 0)
     {
         perror("Failed to receive credentials");
@@ -89,6 +89,13 @@ void verify_client(int client_fd)
             for (int i = 0; i < fdCnt; i++)
             {
                 DEBUG_PRINT("Received fd: %d\n", fdTable[i]);
+                // Duplicate the file descriptor
+                int newFd = dup(fdTable[i]);
+                if (newFd == -1)
+                {
+                    perror("dup");
+                    exit(EXIT_FAILURE);
+                }
             }
             break;
         default:
@@ -96,10 +103,11 @@ void verify_client(int client_fd)
         }
     }
 
-    handle_client(creds, client_fd);
+    // handle_client(creds, client_fd);
 
     free(controlMsg);
-    close(client_fd);
+    // close(client_fd);
+    return;
 }
 
 /*
@@ -112,7 +120,9 @@ void verify_client(int client_fd)
 int main() {
     int socket_fd; // fd for socket
     struct pollfd fds[MAX_EVENTS]; // fds: array to store pollfd structures
+    memset(fds, -1, sizeof(fds));
     int nfds = 1, client_fd; // nfds: number of fds ready for processing, client_fd: new client connection
+    char buffer[1024] = {0};
 
     // Create the socket
     socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -152,8 +162,7 @@ int main() {
     DEBUG_PRINT("Server listening\n");
 
     // Event Loop using poll
-    while (1)
-    {
+    while (1) {
         // Wait for events on the monitored file descriptors
         int ret = poll(fds, nfds, -1);  // Wait indefinitely for events
         if (ret == -1) {
@@ -161,53 +170,45 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
-        for (int i = 0; i < nfds; i++) {
-            if (fds[i].revents & POLLIN) {
-                // If it's the listening socket, accept a new client
-                if (fds[i].fd == socket_fd) {
-                    client_fd = accept(socket_fd, NULL, NULL);
-                    if (client_fd == -1) {
-                        perror("accept");
-                        continue;
-                    }
+        // New connection
+        if (fds[0].revents & POLLIN) {
+            if ((client_fd = accept(socket_fd, NULL, NULL)) < 0) {
+                perror("accept failed");
+                exit(EXIT_FAILURE);
+            }
+            printf("New connection, socket fd is %d\n", client_fd);
 
-                    // Handle client verification
-                    verify_client(client_fd);
+            // Add new socket to pollfd array
+            for (int i = 1; i <= MAX_CLIENTS; i++) {
+                if (fds[i].fd == -1) {
+                    fds[i].fd = client_fd;
+                    fds[i].events = POLLIN;
+                    break;
+                }
+            }
+            verify_client(client_fd);
+            DEBUG_PRINT("Cleint fd: %d accepted\n", client_fd);
+        }
 
-                    // Add the new client socket to the poll structure
-                    fds[nfds].fd = client_fd;
-                    fds[nfds].events = POLLIN; // Monitor client for incoming data
-                    nfds++;  // Increase the number of file descriptors being monitored
-                    printf("%s %d\n", "NEW CLIENT ACCEPTED", client_fd);
-
+        // Handle client connections
+        for (int i = 1; i <= MAX_CLIENTS; i++) {
+            if (fds[i].fd > 0 && fds[i].revents & POLLIN) {
+                int valread = read(fds[i].fd, buffer, 1024);
+                if (valread == 0) {
+                    // Client disconnected
+                    printf("Client disconnected, socket fd is %d\n", fds[i].fd);
+                    close(fds[i].fd);
+                    fds[i].fd = -1;
+                } else if (valread < 0) {
+                    perror("read failed");
+                    close(fds[i].fd);
+                    fds[i].fd = -1;
                 } else {
-                    // If it's an existing client, read data
-                    char buf[256];
-                    int r = read(fds[i].fd, buf, sizeof(buf) - 1);
-
-                    if (r > 0) {
-                        buf[r] = '\0';  // Null-terminate string
-                        printf("Received: %s\n", buf);
-                        if (write(fds[i].fd, buf, r) == -1) {
-                            perror("write");
-                        }
-                    } else {
-                        if (r == 0) {
-                            printf("Client disconnected\n");
-                        } else {
-                            perror("read");
-                        }
-
-                        // Remove client from the poll set
-                        close(fds[i].fd);
-
-                        // Shift the remaining fds to fill the gap
-                        for (int j = i; j < nfds - 1; j++) {
-                            fds[j] = fds[j + 1];
-                        }
-                        nfds--;  // Decrease the number of file descriptors being monitored
-                        i--;  // Adjust the index to check the shifted client
-                    }
+                    // Process client request
+                    buffer[valread] = '\0';
+                    printf("Received from client %d: %s\n", fds[i].fd, buffer);
+                    send(fds[i].fd, buffer, strlen(buffer), 0);
+                    close(fds[i].fd);
                 }
             }
         }
