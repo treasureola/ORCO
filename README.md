@@ -110,6 +110,8 @@ This section outlines the work distribution and contribution of each member of t
   - Contributed to the development of the database concept for the project and assisted in its implementation
 - Test
   - Tested the core functionality of the server, including handling multiple client connections and scenarios such as when a client fails to send credentials
+- Documentation:
+  - Overview and Project Goals
 ---
 
 ### Testing
