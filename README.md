@@ -113,5 +113,11 @@ This section outlines the work distribution and contribution of each member of t
 - Documentation:
   - Overview and Project Goals
 ---
-
+#### Treasure
+- Event Loop
+  - Server can recieve incoming client connections through the name socket and save the client socket fd 
+  table
+  - Server can identify when any existing client already in the fd table is sending a request through POLLIN
+- Database
+  - Contributed to the development of the database concept for the project and assisted in its implementation
 ### Testing
