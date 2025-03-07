@@ -1,4 +1,7 @@
 #include "comm.h"
+#ifdef SERVER_TESTS
+#define exit(arg) return (void*)arg;
+#endif
 
 /*
  * Server program
@@ -213,7 +216,7 @@ int accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
     if (!client_idx) {
         close(client_fd);
         DEBUG_PRINT("Client fd: %d rejected (max clients reached)\n", client_fd);
-        return 0;
+        return -2;
     }
     
     int success = verify_client(client_fd);
@@ -221,7 +224,7 @@ int accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
         close(client_fd);
         DEBUG_PRINT("Client fd: %d rejected (verify failed)\n", client_fd);
         fds[client_idx].fd = -1;
-        return 0;
+        return -1;
     }
 
     DEBUG_PRINT("Client fd: %d accepted\n", client_fd);

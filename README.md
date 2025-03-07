@@ -256,6 +256,7 @@ When clients initially connect and wait to be accepted by the server, they must 
 
 > Pass file descriptors between the service and the client.
 
+The server is capable of receiving and passing file descriptors over the UNIX domain socket to facilitate the exchange of resources. When a client connects, it sends a file descriptor, and the server uses dup() to handle it. This allows the server to interact with files or other resources on behalf of the client, ensuring proper access control based on the provided credentials. This process is managed using control messages with the SCM_RIGHTS type, enabling efficient file descriptor handling between client and server.
 ---
 
 ### Work Distribution
@@ -270,7 +271,7 @@ This section outlines the work distribution and contribution of each member of t
     - Accepts incoming connection requests from client
   - Clients can open same named socket to send request over the server
 - Client Certification
-  - Ensure that a client can communicate their personal identification over an opened named socekt
+  - Ensure that a client can communicate their personal identification over an opened named socket
   - Correctly recieve message from connected client
 
 #### Fred
@@ -288,11 +289,28 @@ This section outlines the work distribution and contribution of each member of t
 #### Treasure
 
 - Event Loop
-  - Server can recieve incoming client connections through the name socket and save the client socket fd table
+  - Server can recieve incoming client connections through the name socket and save the client socket fd 
+  table
   - Server can identify when any existing client already in the fd table is sending a request through POLLIN
 - Database
   - Contributed to the development of the database concept for the project and assisted in its implementation
 
----
+#### Cynthia
+
+- Testing
+  - Split main into separate functions to allow for a more robust testing suite
+- Documentation
+  - Wrote detailed documentation for server functions
+  - Project Goals
 
 ### Testing
+
+To use the testing suite simply make and then run exceute the binary ./server_tests.
+
+Additionally, there are a few tests that were written before the testing suite was finished, which can be run by running ./server in shell instance, then ./test_1 through ./test_2.
+
+The expected outputs are as follows:
+- test_1
+  - This test should fail to send credentials, as it tries to pass fake credentials. The server will see the client connect then fail verifications.
+- test_2
+  - This test should show two clients with different pids connect, get verified, pass fds, and disconnect.

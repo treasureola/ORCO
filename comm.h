@@ -27,13 +27,11 @@ typedef struct Client
 } Client;
 
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 #ifdef DEBUG_MODE
     #define DEBUG_PRINT(fmt, ...) fprintf(stderr, "DEBUG:   " fmt, ##__VA_ARGS__)
 #else
     #define DEBUG_PRINT(fmt, ...) // Do nothing when DEBUG_MODE is not defined
-#endif
-
 #endif
 
 typedef struct {
@@ -43,3 +41,7 @@ typedef struct {
     char write_string[1024]; // IF write, the data the user wants to worite to the file
     int read_bytes; //If read, the number of bytes the user wants to read
 }Request;
+
+#endif
+
+
