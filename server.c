@@ -8,6 +8,16 @@
  *  and files descriptors and prcoesses them.
  */
 
+/**
+ * @brief Handles a client's request to read or write a file.
+ *
+ * This function processes a client's request to either read from or write to a file.
+ * It checks if the requested file is accessible based on the provided access code,
+ * and performs the requested action (read or write).
+ *
+ * @param request The client's request containing the filename, action, and other relevant data.
+ * @param fd The file descriptor of the connected client.
+ */
 void handle_request(Request request, int fd){
     char *files[3] = {"file1.txt", "file2.txt", "file3.txt"};
     DEBUG_PRINT("In handle_request\n");
@@ -39,10 +49,16 @@ void handle_request(Request request, int fd){
     return;
 }
 
-/*
- * verify_client
+/**
+ * @brief Verifies the client's credentials and file descriptors.
  *
- * This function verifies a client's credentials
+ * This function receives and verifies the client's credentials and file descriptors
+ * sent over a UNIX domain socket. It checks for SCM_CREDENTIALS and SCM_RIGHTS
+ * messages and processes them accordingly.
+ *
+ * @param client_fd The file descriptor of the connected client.
+ * @return TRUE if the client's credentials and file descriptors are successfully verified, FALSE otherwise.
+ *
  */
 int verify_client(int client_fd)
 {
@@ -101,49 +117,79 @@ int verify_client(int client_fd)
         default:
             break;
         }
-
-        return TRUE;
     }
 
     // handle_client(creds, client_fd);
 
     free(controlMsg);
     // close(client_fd);
-    return;
+    return TRUE;
 }
 
-void setup_socket(int *socket_fd, struct sockaddr_un **addr) {
+/**
+ * @brief Sets up a socket for polling.
+ *
+ * This function creates and initializes a socket at the specified path and
+ * returns a pointer to a `struct pollfd` that can be used for polling the socket.
+ *
+ * @param socket_path The file system path where the socket will be created.
+ * @return A pointer to a `struct pollfd` that represents the socket for polling.
+ *         The caller is responsible for freeing the memory allocated for the
+ *         `struct pollfd` when it is no longer needed.
+ */
+struct pollfd* setup_socket(const char *socket_path) {
+    int socket_fd;
+    struct sockaddr_un *addr = malloc(sizeof(struct sockaddr_un));
+    struct pollfd *fds = malloc(MAX_EVENTS * sizeof(struct pollfd));
+    memset(fds, -1, MAX_EVENTS * sizeof(struct pollfd));
+
     // Create the socket
-    *socket_fd = socket(AF_UNIX, SOCK_STREAM, 0); 
-    if (*socket_fd == -1) {
+    socket_fd = socket(AF_UNIX, SOCK_STREAM, 0); 
+    if (socket_fd == -1) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
-    unlink(SOCKET_PATH);
+    unlink(socket_path);
 
-    *addr = malloc(sizeof(struct sockaddr_un));
-    memset(*addr, 0, sizeof(struct sockaddr_un));
-
-    (*addr)->sun_family = AF_UNIX;
-    strncpy((*addr)->sun_path, SOCKET_PATH, sizeof((*addr)->sun_path) - 1);
+    memset(addr, 0, sizeof(struct sockaddr_un));
+    addr->sun_family = AF_UNIX;
+    strncpy(addr->sun_path, socket_path, sizeof(addr->sun_path) - 1);
 
     // Bind the socket
-    if (bind(*socket_fd, (struct sockaddr *)*addr, sizeof(struct sockaddr_un)) < 0) {
+    if (bind(socket_fd, (struct sockaddr *)addr, sizeof(struct sockaddr_un)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
     int enable = 1;
-    setsockopt(*socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
+    setsockopt(socket_fd, SOL_SOCKET, SO_PASSCRED, &enable, sizeof(enable));
 
-    if (listen(*socket_fd, 5) < 0) {
+    if (listen(socket_fd, 5) < 0) {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
+
+    // Set up the poll structure for the listening socket
+    fds[0].fd = socket_fd;
+    fds[0].events = POLLIN; // Monitor incoming connections (read events)
+
+    free(addr);
+    return fds;
 }
 
-void accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
+/**
+ * @brief Accepts a new client connection and adds it to the pollfd array.
+ *
+ * This function accepts a new client connection on the specified socket,
+ * verifies the client's credentials, and adds the client's file descriptor
+ * to the pollfd array for monitoring.
+ *
+ * @param socket_fd The file descriptor of the listening socket.
+ * @param fds The array of pollfd structures used for polling.
+ * @param nfds A pointer to the number of file descriptors currently being monitored.
+ */
+int accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
     int client_fd; //client_fd: new client connection
 
     if ((client_fd = accept(socket_fd, NULL, NULL)) < 0) {
@@ -167,7 +213,7 @@ void accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
     if (!client_idx) {
         close(client_fd);
         DEBUG_PRINT("Client fd: %d rejected (max clients reached)\n", client_fd);
-        return;
+        return 0;
     }
     
     int success = verify_client(client_fd);
@@ -175,12 +221,22 @@ void accept_new_connection(int socket_fd, struct pollfd *fds, int *nfds) {
         close(client_fd);
         DEBUG_PRINT("Client fd: %d rejected (verify failed)\n", client_fd);
         fds[client_idx].fd = -1;
-        return;
+        return 0;
     }
 
     DEBUG_PRINT("Client fd: %d accepted\n", client_fd);
+    return 0;
 }
 
+/**
+ * @brief Handles client connections and processes their requests.
+ *
+ * This function iterates through the array of pollfd structures, checking for
+ * any client connections that have data ready to be read. For each client with
+ * data available, it reads the request, processes it, and handles client disconnection.
+ *
+ * @param fds The array of pollfd structures used for polling.
+ */
 void handle_client_connections(struct pollfd *fds) {
     for (int i = 1; i <= MAX_CLIENTS; i++) {
         if (fds[i].fd > 0 && fds[i].revents & POLLIN) {
@@ -208,18 +264,10 @@ void handle_client_connections(struct pollfd *fds) {
     }
 }
 
+#ifndef SERVER_TESTS
 int main() {
-    int socket_fd; // fd for socket
-    struct sockaddr_un *addr; 
-    struct pollfd fds[MAX_EVENTS]; // fds: array to store pollfd structures
-    memset(fds, -1, sizeof(fds));
+    struct pollfd *fds = setup_socket(SOCKET_PATH);
     int nfds = 1; // nfds: number of fds ready for processing
-
-    setup_socket(&socket_fd, &addr);
-
-   // Set up the poll structure for the listening socket
-   fds[0].fd = socket_fd;
-   fds[0].events = POLLIN; // Monitor incoming connections (read events)
 
     DEBUG_PRINT("Server listening\n");
 
@@ -234,14 +282,16 @@ int main() {
 
         // New connection
         if (fds[0].revents & POLLIN) {
-            accept_new_connection(socket_fd, fds, &nfds);
+            accept_new_connection(fds[0].fd, fds, &nfds);
         }
 
         // Handle client connections
         handle_client_connections(fds);
     }
 
-    close(socket_fd);
+    close(fds[0].fd);
     unlink(SOCKET_PATH); // Clean up the socket file when done
+    free(fds);
     return 0;
 }
+#endif
